@@ -1,0 +1,30 @@
+# 虚拟环境
+venv/
+env/
+.env
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# IDE 与其他
+.vscode/
+.idea/
+.DS_Store
+
+# 临时生成与输出文件
+output_audio/
+generated_audio/
+*.ogg
+*.wav
+*.aiff
+*.mp3
+
+# （如果有下载到本地的模型文件测试）
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors

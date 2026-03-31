@@ -1,48 +1,60 @@
-# OpenClaw 语音克隆交互组件 (Voice-to-Voice Plugin)
+# VoiceCloneBot
 
-这是一个为 **OpenClaw** 设计的通用“语音分身”交互插件机制。
-当处于交互状态时，如果用户发送了一段语音消息，OpenClaw 会先识别用户的文字意图，大模型思考出回复内容，然后用**用户的原声（或指定的声音参考提取音色）**合成最终音频，发回给用户。这形成了完整封闭并且极为连贯的声音镜像（Mirror Voice）体验。
+> 一套完全自给自足的 OpenClaw 标准语音克隆技能。支持多模型引擎、长文本无限生成、后台自守护。
 
-## 机制与分工
+## 快速开始
 
-该插件遵循 OpenClaw 的通用解耦思路：
-1. **语音识别 (ASR)**：请依赖已有的官方 `openai-whisper` 功能将你发来的语音转成文字。
-2. **文本生成 (LLM)**：由用户配置在 OpenClaw 里的 LM-Studio 端点全权生成逻辑内容。
-3. **语音克隆引擎 (TTS)**：本插件只提供重度的 **常驻推理端点 (FastAPI)** 加 **Skill (终端调用接口)**，专门负责吃下文本，克隆特定的参考原声进而吐出拟真后的录音。
-
-## 安装步骤
-
-### 1. 确认前置依赖机制
-请务必保证你所在的 OpenClaw 已安装并能够使用 `openai-whisper` 进行音频转录。这就使得 OpenClaw 的内存流里知道你此前发送的参考原始文件的本地路径。
-
-### 2. 初始化环境与克隆模型
-为了不每次运行都重新读大模型，此组件采用重后端轻前端策略。
-在终端执行安装脚本：
 ```bash
-cd openclaw-voice-clone
-bash install.sh
-```
-*(注意：此脚本会在本机 `~/.openclaw/models/voice-clone` 生成模型权重存放域，以便统一且不重复地下拉 F5-TTS 或相关底层通用模型结构)*
+# 1. 克隆仓库
+git clone https://github.com/conanwhf/VoiceCloneBot.git
+cd VoiceCloneBot
 
-### 3. 配置 OpenClaw Skill 侧
-将本项目的 `skill` 目录链接至你的 OpenClaw 技能库中：
-```bash
-ln -s ${PWD}/skill ~/.openclaw/skills/voice-clone
-# 或是根据你的自定义目录，将其链入 main-workspace/my-skills/skills/voice-clone
+# 2. 安装默认引擎 (F5-TTS)
+bash scripts/auto_installer.sh
+
+# 3. 直接使用（后台服务会自动启动）
+bash scripts/run_tts.sh --text "你好，这是克隆后的声音。" --ref_audio "参考录音.ogg"
 ```
 
-### 4. 启动后端常驻推理服务
+## 支持的引擎
+
+| 引擎 | 安装命令 | 大小 | 零样本克隆 | 平台兼容 | 特点 |
+| --- | --- | --- | :---: | --- | --- |
+| **F5-TTS** | `bash scripts/auto_installer.sh` | ~1.5GB | ✅ | Mac/Linux/Win | 默认引擎。DiT 流匹配，克隆质量天花板 |
+| **CosyVoice** | `bash scripts/install_cosyvoice.sh` | ~1.5GB | ✅ | Mac/Linux/Win | 阿里通义。自然韵律极佳 |
+| **ChatTTS** | `bash scripts/install_chattts.sh` | ~400MB | ❌ | Mac/Linux/Win | 随机音色。支持 `[laugh]` `[uv_break]` 情绪标签 |
+| **OpenVoice** | `bash scripts/install_openvoice.sh` | ~300MB | ✅ | Mac/Linux/Win | MyShell。速度最快，体积最小 |
+
+切换引擎：
 ```bash
-# 在插件主目录下
-source venv/bin/activate
-cd server
-python app.py
+export TTS_BACKEND=cosyvoice  # 可选: f5, cosyvoice, chattts, openvoice
 ```
-这就使本地拥有了一个常驻响应 `http://127.0.0.1:8000/synthesize` 的 TTS 克隆微服务。
 
-## 使用指引
+## 项目结构
 
-一旦装配完成并启动了守护服务：
-1. 向 OpenClaw 说：**“进入语音克隆复读模式。接下来请用这句语音作为你的声音锚点参考。”**
-2. 发送一段十几秒长度的清晰语音录音给 OpenClaw。
-3. OpenClaw 会记住该语音媒体。随后针对你聊的每一句话，系统不仅帮你文字作答，更会自动唤起本 `voice-clone` 技能发出 `.ogg` 录音回来！
+```
+VoiceCloneBot/
+├── SKILL.md                      # Agent 触发规范 (标准 Skill 格式)
+├── VoiceCloneBot.md              # 系统设计文档
+├── README.md                     # 本文件
+├── scripts/
+│   ├── auto_installer.sh         # F5-TTS 默认安装 + OpenClaw 注册
+│   ├── install_cosyvoice.sh      # CosyVoice 引擎安装
+│   ├── install_chattts.sh        # ChatTTS 引擎安装
+│   ├── install_openvoice.sh      # OpenVoice 引擎安装
+│   ├── run_tts.sh                # 自动守护 + 推理入口 (Agent 直接调用)
+│   ├── uninstall.sh              # 清理脚本
+│   └── tts_client.py             # HTTP 通信客户端
+└── server/
+    ├── app.py                    # FastAPI 后台守护服务
+    ├── core_tts.py               # 多引擎工厂 + 长文本切片
+    └── requirements.txt          # F5-TTS 基础依赖
+```
+
+## 长文本支持
+
+系统内置自动断句切片引擎。无论输入多长的文本（哪怕是整篇文章），都会被自动按句号、问号、逗号等切分为安全片段，逐一生成后无缝拼接。无需手动处理。
+
+## 协议
+
+MIT License

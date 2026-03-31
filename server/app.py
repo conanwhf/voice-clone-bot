@@ -3,6 +3,11 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import uuid
+
+# 全局环境变数锁定：在导入任何大模型之前注入这个限制
+os.environ["HF_HOME"] = os.path.expanduser("~/.openclaw/models/voice-clone")
+os.environ["MODELSCOPE_CACHE"] = os.path.expanduser("~/.openclaw/models/voice-clone")
+
 import core_tts
 
 app = FastAPI(title="OpenClaw Voice Clone Backend")

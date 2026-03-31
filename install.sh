@@ -25,16 +25,25 @@ fi
 source venv/bin/activate
 pip install --upgrade pip
 
-# 3. 安装前序依赖组件 (例如 F5-TTS 或 CosyVoice 的基础需求库将放到这里)
+# 3. 安装前序依赖组件 (F5-TTS, Torch 等)
 echo "=== 开始解析并安装 Server 端依赖图谱 ==="
 if [ -f "server/requirements.txt" ]; then
+    # 由于使用 Mac MPS 和各类平台，让 pip 自动根据平台解析 Torch
     pip install -r server/requirements.txt
+    
+    echo ""
+    echo "[*] 为了避免自动权重杂乱，系统已指派 HuggingFace 锚点给 $GLOBAL_MODEL_DIR"
+    # 这里通过临时注入 HF_HOME 来让依赖的 f5-tts 等库如果在自动下载模型时，
+    # 下载到我们的指定全局目录中。
+    export HF_HOME="$GLOBAL_MODEL_DIR"
+    
+    echo "=== 依赖组件处理完毕！==="
 else
-    echo "[!] 警告：未检测到 server/requirements.txt，请保证你已经将其编写完毕。"
+    echo "[!] 警告：未检测到 server/requirements.txt！"
 fi
 
-echo "=== 引擎配置执行完毕！==="
-echo "你现在可以执行："
+echo "=== 引擎基建配置完毕！你要启动后台推理服务时请执行： ==="
 echo "$ source venv/bin/activate"
+echo "$ export HF_HOME=$GLOBAL_MODEL_DIR"
 echo "$ cd server"
 echo "$ python app.py"

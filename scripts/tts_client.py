@@ -7,6 +7,7 @@ def main():
     parser = argparse.ArgumentParser(description="OpenClaw Voice Clone TTS Client")
     parser.add_argument("--text", type=str, required=True, help="需要被语音克隆引擎读出来的文字内容")
     parser.add_argument("--ref_audio", type=str, default="", help="用户指定的参考录音本地绝对路径")
+    parser.add_argument("--speed", type=float, default=1.0, help="可选：调节生成的语速倍率，默认 1.0")
     
     args = parser.parse_args()
     
@@ -18,7 +19,8 @@ def main():
     TARGET_URL = "http://127.0.0.1:8000/clone"
     payload = {
         "text": args.text,
-        "ref_audio_path": args.ref_audio if args.ref_audio else None
+        "ref_audio_path": args.ref_audio if args.ref_audio else None,
+        "speed": args.speed
     }
     
     try:

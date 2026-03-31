@@ -19,12 +19,13 @@ You (the Agent) do NOT need to ask the user to configure anything. Everything is
 When you decide to reply with cloned voice, you must figure out:
 1. `ref_audio`: The absolute path to the reference audio file the user just uploaded or referenced (e.g., `/path/to/user_voice.ogg`).
 2. `text`: The conversational text response you generated.
+3. `speed` (Optional): Speech speed multiplier. Default is 1.0. For faster speech, use 1.2. For slower, use 0.8.
 
 ## Action instructions
 To execute the voice synthesis, you MUST use the bundled `run_tts.sh` wrapper script exactly like this:
 
 ```bash
-bash scripts/run_tts.sh --text "Your generated conversational text." --ref_audio "/absolute/path/to/reference/audio.ogg"
+bash scripts/run_tts.sh --text "Your generated conversational text." --ref_audio "/absolute/path/to/reference/audio.ogg" --speed 1.0
 ```
 
 1. You **MUST NOT** try to manually start python or launch the `app.py` server yourself. The `run_tts.sh` script is capable of self-diagnosing the daemon port and installing Python virtual environments (`venv`) autonomously if this is its first ever run.

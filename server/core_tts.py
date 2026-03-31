@@ -32,7 +32,7 @@ class BaseTTSEngine(ABC):
         pass
 
     @abstractmethod
-    def synthesize(self, text: str, ref_audio: str, output_path: str) -> bool:
+    def synthesize(self, text: str, ref_audio: str, output_path: str, speed: float = 1.0) -> bool:
         """执行推理并输出文件。如果是长文本，应在此层做切片处理。"""
         pass
 
@@ -77,11 +77,11 @@ class F5TTSEngine(BaseTTSEngine):
         )
         print("[F5TTSEngine] 成功挂载权重至显存！")
 
-    def synthesize(self, text: str, ref_audio: str, output_path: str) -> bool:
+    def synthesize(self, text: str, ref_audio: str, output_path: str, speed: float = 1.0) -> bool:
         if not self.model or getattr(self, "vocoder", None) is None:
             raise RuntimeError("Engine or Vocoder not loaded!")
             
-        print(f"[F5TTSEngine] (Device: {self.device}) 提取音色: {ref_audio}")
+        print(f"[F5TTSEngine] (Device: {self.device} | Speed: {speed}x) 提取音色: {ref_audio}")
         print(f"[F5TTSEngine] 正在生成文本: {text}")
         
         from f5_tts.infer.utils_infer import infer_process, preprocess_ref_audio_text
@@ -105,7 +105,7 @@ class F5TTSEngine(BaseTTSEngine):
             nfe_step=32,      # 默认步数，生成速度与质量的良好平衡
             cfg_strength=2.0,
             sway_sampling_coef=-1.0,
-            speed=1.0,
+            speed=speed,
             fix_duration=None,
             device=self.device
         )
@@ -161,13 +161,13 @@ def initialize_models():
         
     _active_engine.load()
 
-def generate_voice(text: str, ref_audio: str, output_path: str) -> bool:
+def generate_voice(text: str, ref_audio: str, output_path: str, speed: float = 1.0) -> bool:
     global _active_engine
     if _active_engine is None:
         raise RuntimeError("全局引擎未就绪")
         
     start_t = time.time()
-    result = _active_engine.synthesize(text, ref_audio, output_path)
+    result = _active_engine.synthesize(text, ref_audio, output_path, speed=speed)
     end_t = time.time()
     print(f"[core_tts] 整体克隆与生成耗时: {end_t - start_t:.2f} 秒")
     return result

@@ -19,6 +19,7 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 class CloneRequest(BaseModel):
     text: str
     ref_audio_path: Optional[str] = None
+    speed: float = 1.0
 
 @app.on_event("startup")
 def load_heavy_models():
@@ -50,7 +51,8 @@ def clone_voice(req: CloneRequest):
         success = core_tts.generate_voice(
             text=req.text,
             ref_audio=req.ref_audio_path,
-            output_path=output_filename
+            output_path=output_filename,
+            speed=req.speed
         )
         
         if success and os.path.exists(output_filename):

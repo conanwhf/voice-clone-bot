@@ -207,7 +207,8 @@ run_tts.sh 被调用
 {
   "text": "要合成的文字",
   "ref_audio_path": "/absolute/path/to/reference.ogg",
-  "speed": 1.0
+  "speed": 1.0,
+  "output_dir": "/custom/path/"
 }
 ```
 

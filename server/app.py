@@ -20,6 +20,7 @@ class CloneRequest(BaseModel):
     text: str
     ref_audio_path: Optional[str] = None
     speed: float = 1.0
+    output_dir: Optional[str] = None
 
 @app.on_event("startup")
 def load_heavy_models():
@@ -42,9 +43,15 @@ def clone_voice(req: CloneRequest):
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Text is empty.")
     
+    # 决定输出路径
+    target_dir = OUTPUT_DIR
+    if req.output_dir:
+        os.makedirs(req.output_dir, exist_ok=True)
+        target_dir = req.output_dir
+        
     # 获取唯一的生成 ID
     request_id = uuid.uuid4().hex[:8]
-    output_filename = os.path.abspath(os.path.join(OUTPUT_DIR, f"reply_{request_id}.ogg"))
+    output_filename = os.path.abspath(os.path.join(target_dir, f"reply_{request_id}.ogg"))
     
     try:
         # 下发至核心逻辑层

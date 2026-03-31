@@ -29,6 +29,7 @@ bash scripts/run_tts.sh --text "你好，这是克隆后的声音。" --ref_audi
 | `--text` | 要合成的文字（必填） | — |
 | `--ref_audio` | 参考录音路径（必填） | — |
 | `--speed` | 语速倍率（0.5-2.0） | 1.0 |
+| `--output_dir` | 音频输出目录（可选） | 根目录/server/generated_audio/ |
 
 ## 语气与情绪
 

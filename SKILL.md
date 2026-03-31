@@ -11,7 +11,7 @@ A self-initializing, zero-configuration voice cloning skill. It manages a backgr
 
 | Item | Value |
 | --- | --- |
-| Entry script | `bash scripts/run_tts.sh --text "..." --ref_audio "..." [--speed 1.0]` |
+| Entry script | `bash scripts/run_tts.sh --text "..." --ref_audio "..." [--speed 1.0] [--output_dir "..."]` |
 | Output | Single line: absolute path to generated `.ogg` file |
 | Attachment format | `MEDIA:<output_path>` |
 | Default engine | F5-TTS (env `TTS_BACKEND=f5`) |
@@ -42,6 +42,7 @@ bash scripts/run_tts.sh --text "Your reply text here." --ref_audio "/absolute/pa
 
 Optional parameters:
 - `--speed 1.2` — Speak faster. Range: 0.5 to 2.0. Default: 1.0.
+- `--output_dir "/tmp/"` — Save the generated audio file to a specific absolute folder path. Default: `server/generated_audio/`.
 
 **Example with all options:**
 ```bash

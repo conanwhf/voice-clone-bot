@@ -134,7 +134,7 @@ ENGINE_REGISTRY["mynew"] = MyNewEngine
 
 因此，控制情绪的正确做法是：**选择情绪匹配的参考音频**。
 
-例外：ChatTTS 支持在文字中嵌入 `[laugh]`(笑声)、`[uv_break]`(停顿) 等标签，但 ChatTTS 不支持声音克隆。
+额外说明：ChatTTS 除支持克隆外，还支持在文字中嵌入 `[laugh]`(笑声)、`[uv_break]`(停顿) 等专属标签进行细粒度韵律控制。
 
 ---
 

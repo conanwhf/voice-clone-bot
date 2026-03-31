@@ -306,8 +306,6 @@ class ChatTTSEngine(BaseTTSEngine):
     依赖：需要先用 scripts/install_chattts.sh 安装。
     核心库: ChatTTS (从 github 克隆)
     特性: 极强的对话韵律控制，支持 [laugh] [uv_break] 等标记。
-    注意: ChatTTS 不支持零样本声音克隆，它使用随机种子生成不同音色。
-          ref_audio 参数在此引擎下不生效。
     """
     def load(self):
         print(f"[ChatTTSEngine] 分配计算单元: {self.device}")

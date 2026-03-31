@@ -17,7 +17,7 @@ bash scripts/run_tts.sh --text "你好，这是克隆后的声音。" --ref_audi
 | --- | --- | --- | :---: | --- | --- |
 | **F5-TTS** | `bash scripts/auto_installer.sh` | ~1.5GB | ✅ | 原生 | 默认。克隆质量最高 |
 | **CosyVoice** | `bash scripts/install_cosyvoice.sh` | ~1.5GB | ✅ | ffmpeg | 阿里。中文韵律极佳 |
-| **ChatTTS** | `bash scripts/install_chattts.sh` | ~400MB | ❌ | ffmpeg | 支持 `[laugh]` 等情绪标签 |
+| **ChatTTS** | `bash scripts/install_chattts.sh` | ~400MB | ✅ | ffmpeg | 支持 `[laugh]` 等情绪标签与克隆 |
 | **OpenVoice** | `bash scripts/install_openvoice.sh` | ~300MB | ✅ | ffmpeg | 速度最快，体积最小 |
 
 切换引擎：`export TTS_BACKEND=cosyvoice`

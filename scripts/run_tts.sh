@@ -36,7 +36,7 @@ if ! curl -m 2 -s "${SERVER_BASE_URL}/openapi.json" > /dev/null; then
     export HF_HOME="$HOME/.openclaw/models/voice-clone"
     
     cd server
-    nohup python app.py > daemon_server.log 2>&1 &
+    nohup $CDIR/venv/bin/python app.py > daemon_server.log 2>&1 &
     DAEMON_PID=$!
     cd ..
     
@@ -61,4 +61,4 @@ fi
 
 # 3. Transparently pass all arguments to the actual communication client securely
 #    This script expects: --text "..." --ref_audio "..."
-python scripts/tts_client.py "$@"
+$CDIR/venv/bin/python scripts/tts_client.py "$@"

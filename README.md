@@ -11,6 +11,23 @@ bash scripts/auto_installer.sh
 bash scripts/run_tts.sh --text "你好，这是克隆后的声音。" --ref_audio "参考录音.ogg"
 ```
 
+## 服务端口配置
+
+不再硬编码端口。复制配置模板后按需修改：
+
+```bash
+cp .env.example .env
+```
+
+示例：
+
+```env
+TTS_SERVER_HOST=127.0.0.1
+TTS_SERVER_PORT=18000
+```
+
+`run_tts.sh`、`tts_client.py`、`server/app.py` 会统一读取该配置。
+
 ## 引擎选择
 
 | 引擎 | 安装 | 大小 | 克隆 | 语速 | 特点 |

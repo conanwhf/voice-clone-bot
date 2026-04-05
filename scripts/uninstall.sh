@@ -12,6 +12,16 @@ set -e
 CDIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$CDIR"
 
+# 读取可选配置，保证清理的端口与运行时一致
+CONFIG_FILE="${TTS_CONFIG_FILE:-$CDIR/.env}"
+if [ -f "$CONFIG_FILE" ]; then
+    set -a
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE"
+    set +a
+fi
+TTS_SERVER_PORT="${TTS_SERVER_PORT:-8000}"
+
 MODE="all"
 PURGE_MODELS=false
 
@@ -32,12 +42,12 @@ echo "=== VoiceCloneBot 卸载与清理 ==="
 echo ""
 echo "[1/5] 终止后台服务进程..."
 
-PIDS=$(lsof -t -i:8000 2>/dev/null || echo "")
+PIDS=$(lsof -t -i:"$TTS_SERVER_PORT" 2>/dev/null || echo "")
 if [ -n "$PIDS" ]; then
     kill -9 $PIDS 2>/dev/null || true
-    echo "    ✓ 已关闭端口 8000 的进程 (PID: $PIDS)"
+    echo "    ✓ 已关闭端口 $TTS_SERVER_PORT 的进程 (PID: $PIDS)"
 else
-    echo "    - 端口 8000 未被占用"
+    echo "    - 端口 $TTS_SERVER_PORT 未被占用"
 fi
 pkill -f "python app.py" 2>/dev/null && echo "    ✓ 已清理残留 app.py 进程" || true
 

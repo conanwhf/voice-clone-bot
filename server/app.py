@@ -3,6 +3,38 @@ from pydantic import BaseModel
 from typing import Optional
 import os
 import uuid
+from pathlib import Path
+
+
+def load_env_file():
+    """
+    在 server/app.py 直接运行时，自动回填项目根目录 .env 中的配置。
+    """
+    repo_root = Path(__file__).resolve().parent.parent
+    env_path = Path(os.getenv("TTS_CONFIG_FILE", str(repo_root / ".env")))
+    if not env_path.exists():
+        return
+
+    with env_path.open("r", encoding="utf-8") as f:
+        for line in f:
+            raw = line.strip()
+            if not raw or raw.startswith("#") or "=" not in raw:
+                continue
+            key, value = raw.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = value
+
+
+def env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
+
+load_env_file()
 
 # 全局环境变数锁定：在导入任何大模型之前注入这个限制
 os.environ["HF_HOME"] = os.path.expanduser("~/.openclaw/models/voice-clone")
@@ -74,5 +106,7 @@ def clone_voice(req: CloneRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    # 为了防止和其它大模型推理端口冲突，选了 8000 可自由替换
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    host = os.getenv("TTS_SERVER_HOST", "127.0.0.1")
+    port = env_int("TTS_SERVER_PORT", 8000)
+    print(f"[app] 启动地址: http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port)

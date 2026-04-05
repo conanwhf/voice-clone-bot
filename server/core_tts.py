@@ -10,9 +10,18 @@ import numpy as np
 # 0. 长文本断句切片工具 (Sentence Chunker)
 # ==========================================
 
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except Exception:
+        return default
+
 # 单次推理的安全字符上限。超过此值的文本将被自动切片。
-# F5-TTS 官方建议单次不超过约 100-200 字（中文）以获得最佳质量。
-MAX_CHUNK_CHARS = 150
+# 为提升稳定性，默认设为 50；可通过 TTS_MAX_CHUNK_CHARS 覆盖。
+MAX_CHUNK_CHARS = max(20, _env_int("TTS_MAX_CHUNK_CHARS", 50))
+STITCH_CROSSFADE_MS = max(0, _env_int("TTS_STITCH_CROSSFADE_MS", 80))
+MAX_EDGE_TRIM_MS = max(0, _env_int("TTS_MAX_EDGE_TRIM_MS", 350))
+SILENCE_THRESHOLD = 2e-4
 
 def split_text_to_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list:
     """
@@ -20,6 +29,8 @@ def split_text_to_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list:
     切片优先级：句号/叹号/问号 > 分号/冒号 > 逗号 > 空格强制截断。
     每个切片的长度不超过 max_chars。
     """
+    text = re.sub(r"\s+", " ", text).strip()
+
     if len(text) <= max_chars:
         return [text]
 
@@ -81,12 +92,19 @@ class BaseTTSEngine(ABC):
         self.vocoder = None
 
     def _get_optimal_device(self) -> str:
+        forced_device = os.getenv("TTS_DEVICE", "").strip().lower()
+        if forced_device in {"cpu", "cuda", "mps"}:
+            return forced_device
+
         try:
             import torch
             if torch.cuda.is_available():
                 return "cuda"
             elif torch.backends.mps.is_available():
-                return "mps"
+                # F5-TTS 在部分 Apple MPS 场景下对长文本不稳定，默认关闭 MPS。
+                if os.getenv("TTS_ENABLE_MPS", "0").lower() in {"1", "true", "yes", "on"}:
+                    return "mps"
+                print("[BaseTTSEngine] 检测到 MPS，但默认使用 CPU 以保证长文本稳定性（可设 TTS_ENABLE_MPS=1 手动开启）")
         except ImportError:
             pass
         return "cpu"
@@ -123,6 +141,144 @@ class BaseTTSEngine(ABC):
             os.unlink(in_path)
             return audio
 
+    @staticmethod
+    def _normalize_audio_array(audio) -> np.ndarray:
+        """
+        将模型输出统一压平为 1D float32，修正长文本分片中常见的形状不一致问题。
+        """
+        arr = np.asarray(audio)
+
+        if arr.size == 0:
+            return np.array([], dtype=np.float32)
+
+        if arr.ndim == 2:
+            if arr.shape[0] == 1:
+                arr = arr[0]
+            elif arr.shape[1] == 1:
+                arr = arr[:, 0]
+            elif arr.shape[1] == 2:
+                arr = arr.mean(axis=1)
+            else:
+                arr = arr.reshape(-1)
+        elif arr.ndim > 2:
+            arr = arr.reshape(-1)
+
+        arr = np.nan_to_num(arr.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+        return arr
+
+    @staticmethod
+    def _trim_edge_silence(audio: np.ndarray, sample_rate: int) -> np.ndarray:
+        """
+        裁剪片段首尾过长静音（最多各裁剪 MAX_EDGE_TRIM_MS），避免长文本片段拼接出现“卡顿空档”。
+        """
+        if audio.size == 0:
+            return audio
+
+        non_silent = np.flatnonzero(np.abs(audio) > SILENCE_THRESHOLD)
+        if non_silent.size == 0:
+            return audio
+
+        max_trim_samples = int(sample_rate * MAX_EDGE_TRIM_MS / 1000.0)
+        if max_trim_samples <= 0:
+            return audio
+
+        # 保留一点缓冲，避免截断爆破音
+        pad = int(sample_rate * 0.01)
+        start = max(0, non_silent[0] - pad)
+        end = min(len(audio), non_silent[-1] + 1 + pad)
+
+        # 每侧最多裁剪 max_trim_samples，避免过度裁剪自然停顿
+        start = min(start, max_trim_samples)
+        end = max(end, len(audio) - max_trim_samples)
+        return audio[start:end]
+
+    @staticmethod
+    def _stitch_segments(segments: list, sample_rate: int) -> np.ndarray:
+        """
+        交叉淡化拼接各片段，减少分片连接点的爆音/断裂。
+        """
+        if not segments:
+            return np.array([], dtype=np.float32)
+
+        out = segments[0]
+        crossfade_samples = int(sample_rate * STITCH_CROSSFADE_MS / 1000.0)
+
+        for seg in segments[1:]:
+            if out.size == 0:
+                out = seg
+                continue
+            if seg.size == 0:
+                continue
+
+            n = min(crossfade_samples, len(out), len(seg))
+            if n <= 0:
+                out = np.concatenate([out, seg])
+                continue
+
+            fade_out = np.linspace(1.0, 0.0, n, endpoint=False, dtype=np.float32)
+            fade_in = np.linspace(0.0, 1.0, n, endpoint=False, dtype=np.float32)
+            blended = out[-n:] * fade_out + seg[:n] * fade_in
+            out = np.concatenate([out[:-n], blended, seg[n:]])
+
+        return out
+
+    def _recover_from_chunk_error(self, error: Exception) -> bool:
+        """
+        子类可覆盖：在 chunk 推理异常后尝试自愈（例如重置模型）。
+        返回 True 表示已执行恢复，可立即重试当前 chunk。
+        """
+        return False
+
+    def _synthesize_chunk_with_fallback(
+        self,
+        text: str,
+        ref_audio: str,
+        speed: float,
+        depth: int = 0
+    ) -> list:
+        """
+        某个 chunk 推理失败时，自动递归二次切片重试，提升长文本成功率。
+        返回 [(audio_segment, sample_rate), ...]
+        """
+        try:
+            audio_seg, sr = self.synthesize_chunk(text, ref_audio, speed)
+            if not self.NATIVE_SPEED_SUPPORT and abs(speed - 1.0) >= 0.01:
+                audio_seg = self._apply_speed_ffmpeg(audio_seg, sr, speed)
+            return [(audio_seg, sr)]
+        except Exception as e:
+            if depth <= 1 and self._recover_from_chunk_error(e):
+                try:
+                    audio_seg, sr = self.synthesize_chunk(text, ref_audio, speed)
+                    if not self.NATIVE_SPEED_SUPPORT and abs(speed - 1.0) >= 0.01:
+                        audio_seg = self._apply_speed_ffmpeg(audio_seg, sr, speed)
+                    return [(audio_seg, sr)]
+                except Exception as recovered_e:
+                    e = recovered_e
+
+            min_retry_chars = 35
+            max_retry_depth = 4
+            if len(text) <= min_retry_chars or depth >= max_retry_depth:
+                raise RuntimeError(f"chunk 重试失败，depth={depth}, text_len={len(text)}: {e}") from e
+
+            next_max_chars = max(min_retry_chars, len(text) // 2)
+            retry_chunks = split_text_to_chunks(text, max_chars=next_max_chars)
+            if len(retry_chunks) <= 1:
+                mid = len(text) // 2
+                retry_chunks = [text[:mid], text[mid:]]
+
+            print(
+                f"[BaseTTSEngine] chunk 失败，自动二次切片重试 "
+                f"(depth={depth + 1}, {len(text)} -> {len(retry_chunks)} 段, error={e})"
+            )
+
+            merged = []
+            for sub in retry_chunks:
+                sub = sub.strip()
+                if not sub:
+                    continue
+                merged.extend(self._synthesize_chunk_with_fallback(sub, ref_audio, speed, depth + 1))
+            return merged
+
     @abstractmethod
     def load(self):
         """将模型重度权重从 self.model_dir 载入 self.device 显存以常驻"""
@@ -145,19 +301,32 @@ class BaseTTSEngine(ABC):
         print(f"[BaseTTSEngine] 文本共 {len(text)} 字，切分为 {len(chunks)} 个片段")
 
         all_segments = []
-        sample_rate = 24000  # 大多数模型默认 24kHz
+        sample_rate = None
 
         for i, chunk in enumerate(chunks):
             print(f"  [{i+1}/{len(chunks)}] 推理中: '{chunk[:40]}...'")
-            audio_seg, sr = self.synthesize_chunk(chunk, ref_audio, speed)
-            # 对不原生支持 speed 的引擎，通过 ffmpeg 后处理变速
-            if not self.NATIVE_SPEED_SUPPORT and abs(speed - 1.0) >= 0.01:
-                audio_seg = self._apply_speed_ffmpeg(audio_seg, sr, speed)
-            sample_rate = sr
-            all_segments.append(audio_seg)
+            chunk_segments = self._synthesize_chunk_with_fallback(chunk, ref_audio, speed)
+
+            for audio_seg, sr in chunk_segments:
+                audio_seg = self._normalize_audio_array(audio_seg)
+                audio_seg = self._trim_edge_silence(audio_seg, sr)
+
+                if audio_seg.size == 0:
+                    print(f"  [{i+1}/{len(chunks)}] 警告：该片段生成结果为空，已跳过")
+                    continue
+
+                if sample_rate is None:
+                    sample_rate = sr
+                elif sr != sample_rate:
+                    raise RuntimeError(f"采样率不一致: chunk_sr={sr}, expected_sr={sample_rate}")
+
+                all_segments.append(audio_seg)
+
+        if not all_segments or sample_rate is None:
+            raise RuntimeError("所有文本片段都未生成有效音频")
 
         # 拼接所有片段
-        final_wave = np.concatenate(all_segments) if all_segments else np.array([])
+        final_wave = self._stitch_segments(all_segments, sample_rate)
 
         # 写入中间 WAV
         tmp_wav = output_path.replace(".ogg", ".wav")
@@ -215,6 +384,47 @@ class F5TTSEngine(BaseTTSEngine):
 
         # 缓存预处理后的参考音频，避免每个 chunk 反复提取
         self._cached_ref = {}
+        self._mps_fallback_done = False
+        if not hasattr(self, "_auto_reset_count"):
+            self._auto_reset_count = 0
+
+    def _fallback_mps_to_cpu(self, reason: Exception) -> bool:
+        """
+        F5 在部分 Apple MPS 场景下长文本会触发 tensor shape mismatch。
+        发生后自动切换到 CPU 重试，优先保证可用性。
+        """
+        if self.device != "mps" or self._mps_fallback_done:
+            return False
+
+        print(f"[F5TTSEngine] 检测到 MPS 推理异常，切换 CPU 重试。原因: {reason}")
+        try:
+            if hasattr(self.model, "to"):
+                self.model = self.model.to("cpu")
+            if hasattr(self.vocoder, "to"):
+                self.vocoder = self.vocoder.to("cpu")
+            self.device = "cpu"
+            self._mps_fallback_done = True
+            return True
+        except Exception as e:
+            print(f"[F5TTSEngine] 切换 CPU 失败: {e}")
+            return False
+
+    def _recover_from_chunk_error(self, error: Exception) -> bool:
+        msg = str(error)
+        if "Sizes of tensors must match" not in msg:
+            return False
+
+        max_resets = max(1, _env_int("TTS_F5_MAX_AUTO_RESET", 4))
+        if self._auto_reset_count >= max_resets:
+            return False
+
+        self._auto_reset_count += 1
+        print(
+            f"[F5TTSEngine] 检测到不稳定张量错误，执行自动热重载恢复 "
+            f"({self._auto_reset_count}/{max_resets})"
+        )
+        self.load()
+        return True
 
     def _get_ref(self, ref_audio: str):
         """缓存参考音频的预处理结果"""
@@ -229,20 +439,30 @@ class F5TTSEngine(BaseTTSEngine):
 
         ref_audio_proc, ref_text_proc = self._get_ref(ref_audio)
 
-        audio_segment, final_sample_rate, _ = infer_process(
-            ref_audio_proc, ref_text_proc, text,
-            self.model, self.vocoder,
-            mel_spec_type="vocos",
-            target_rms=0.1,
-            cross_fade_duration=0.15,
-            nfe_step=32,
-            cfg_strength=2.0,
-            sway_sampling_coef=-1.0,
-            speed=speed,
-            fix_duration=None,
-            device=self.device
-        )
-        return audio_segment, final_sample_rate
+        def _run_once():
+            return infer_process(
+                ref_audio_proc, ref_text_proc, text,
+                self.model, self.vocoder,
+                mel_spec_type="vocos",
+                target_rms=0.1,
+                cross_fade_duration=0.15,
+                nfe_step=32,
+                cfg_strength=2.0,
+                sway_sampling_coef=-1.0,
+                speed=speed,
+                fix_duration=None,
+                device=self.device
+            )
+
+        try:
+            audio_segment, final_sample_rate, _ = _run_once()
+            return audio_segment, final_sample_rate
+        except RuntimeError as e:
+            msg = str(e)
+            if "Sizes of tensors must match" in msg and self._fallback_mps_to_cpu(e):
+                audio_segment, final_sample_rate, _ = _run_once()
+                return audio_segment, final_sample_rate
+            raise
 
 
 # ==========================================

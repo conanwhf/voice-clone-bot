@@ -15,6 +15,7 @@ A self-initializing, zero-configuration voice cloning skill. It manages a backgr
 | Output | Single line: absolute path to generated `.ogg` file |
 | Attachment format | `MEDIA:<output_path>` |
 | Default engine | F5-TTS (env `TTS_BACKEND=f5`) |
+| Host/Port config | `.env` (`TTS_SERVER_HOST`, `TTS_SERVER_PORT`) |
 
 ## When to use this skill
 

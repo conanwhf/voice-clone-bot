@@ -28,3 +28,4 @@ models/
 *.pth
 *.bin
 *.safetensors
+daemon_server.log

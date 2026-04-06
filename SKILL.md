@@ -1,5 +1,5 @@
 ---
-name: openclaw-voice-clone
+name: voice-clone-bot
 description: Synthesize speech by cloning a user's voice from a reference audio sample, then reading generated text aloud in that cloned voice. Use this skill whenever the user sends a voice message and expects an audio reply, asks to "speak", "clone my voice", "read this aloud", "reply with audio", or any context where a spoken voice response is appropriate. Also use when the user wants to switch into "voice mode" for conversation. Even if the user doesn't explicitly say "voice clone", use this skill if they send audio input and the natural response would be spoken.
 ---
 
@@ -146,3 +146,8 @@ server/
 ├── core_tts.py              # Multi-engine factory + long text chunking
 └── requirements.txt         # Base dependencies
 ```
+
+
+## References
+
+- Read `references/architecture.md` for system architecture and design rationale.

@@ -1,12 +1,12 @@
-# VoiceCloneBot
+# voice-clone-bot
 
 > OpenClaw 标准语音克隆技能 — 多引擎、长文本、全自动守护。
 
 ## 快速开始
 
 ```bash
-git clone https://github.com/conanwhf/VoiceCloneBot.git
-cd VoiceCloneBot
+git clone https://github.com/conanwhf/voice-clone-bot.git
+cd voice-clone-bot
 bash scripts/auto_installer.sh
 bash scripts/run_tts.sh --text "你好，这是克隆后的声音。" --ref_audio "参考录音.ogg"
 ```
@@ -67,7 +67,7 @@ bash scripts/uninstall.sh --purge       # 连模型权重一起删除
 ## 文档
 
 - [SKILL.md](SKILL.md) — Agent 触发规范
-- [VoiceCloneBot.md](VoiceCloneBot.md) — 系统设计文档
+- [ARCHITECTURE.md](ARCHITECTURE.md) — 系统设计文档
 
 ## 协议
 

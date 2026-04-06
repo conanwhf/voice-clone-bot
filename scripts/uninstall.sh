@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-echo "=== VoiceCloneBot 卸载与清理 ==="
+echo "=== voice-clone-bot 卸载与清理 ==="
 
 # -----------------------------------------------
 # 1. 杀死所有后台守护进程
@@ -98,7 +98,7 @@ fi
 # -----------------------------------------------
 echo ""
 echo "[4/5] 卸除 OpenClaw 技能注册..."
-SKILL_LINK="$HOME/.openclaw/skills/openclaw-voice-clone"
+SKILL_LINK="$HOME/.openclaw/skills/voice-clone-bot"
 if [ -L "$SKILL_LINK" ] || [ -d "$SKILL_LINK" ]; then
     rm -rf "$SKILL_LINK"
     echo "    ✓ 已拔除技能注册: $SKILL_LINK"

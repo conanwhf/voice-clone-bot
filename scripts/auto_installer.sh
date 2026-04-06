@@ -2,14 +2,14 @@
 # voice-clone 全自动沙箱配置与注册运维中心
 
 set -e
-echo "=== 自动探测与注册 OpenClaw Voice Clone 全局插件环境 ==="
+echo "=== 自动探测与注册 voice-clone-bot 全局插件环境 ==="
 
 # 0. 宿主注册机制（面向 Agent 自主化）
 SKILLS_DIR="$HOME/.openclaw/skills"
 THIS_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 if [ -d "$SKILLS_DIR" ]; then 
-    SKILL_LINK="$SKILLS_DIR/openclaw-voice-clone"
+    SKILL_LINK="$SKILLS_DIR/voice-clone-bot"
     if [ -L "$SKILL_LINK" ] || [ -d "$SKILL_LINK" ]; then
         echo "[*] 技能路由已存在于宿主中：$SKILL_LINK，继续检查依赖..."
     else
